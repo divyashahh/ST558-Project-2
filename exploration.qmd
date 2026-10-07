@@ -1,0 +1,385 @@
+---
+title: "Melbourne Housing Data Exploration"
+format: html
+editor: visual
+---
+
+## Setup
+
+```{r}
+library(tidyverse)
+```
+
+## Import Data
+
+```{r}
+housing <- read_csv(
+  "data/Melbourne_housing_FULL.csv",
+  na = c("", "NA", "#N/A")
+)
+```
+
+## Data Cleaning
+
+```{r}
+housing <- housing |>
+  mutate(
+    Type = recode(
+      Type,
+      "h" = "House",
+      "u" = "Unit",
+      "t" = "Townhouse"
+    )
+  )
+```
+
+The Melbourne Housing dataset contains information about residential properties in Melbourne, Australia. The variables include property characteristics, location information, sale information, and property prices.
+
+## Initial Data Exploration
+
+```{r}
+dim(housing)
+```
+
+```{r}
+names(housing)
+```
+
+```{r}
+glimpse(housing)
+```
+
+```{r}
+summary(housing)
+```
+
+## Missing Values
+
+```{r}
+housing |>
+  summarise(
+    missing_price = sum(is.na(Price)),
+    missing_rooms = sum(is.na(Rooms)),
+    missing_type = sum(is.na(Type)),
+    missing_region = sum(is.na(Regionname))
+  )
+```
+
+## Categorical Variable Summaries
+
+### One-Way Contingency Table: Property Type
+
+```{r}
+table(housing$Type, useNA = "ifany")
+```
+
+### One-Way Contingency Table: Region
+
+```{r}
+table(housing$Regionname, useNA = "ifany")
+```
+
+### Two-Way Contingency Table: Property Type and Region
+
+```{r}
+table(
+  housing$Type,
+  housing$Regionname,
+  useNA = "ifany"
+)
+```
+
+## Numerical Summaries
+
+### Price by Property Type
+
+```{r}
+housing |>
+  filter(!is.na(Price), !is.na(Type)) |>
+  group_by(Type) |>
+  summarise(
+    count = n(),
+    mean_price = mean(Price),
+    median_price = median(Price),
+    sd_price = sd(Price),
+    min_price = min(Price),
+    max_price = max(Price)
+  )
+```
+
+### Price by Region
+
+```{r}
+housing |>
+  filter(!is.na(Price), !is.na(Regionname)) |>
+  group_by(Regionname) |>
+  summarise(
+    count = n(),
+    mean_price = mean(Price),
+    median_price = median(Price),
+    sd_price = sd(Price)
+  ) |>
+  arrange(desc(mean_price))
+```
+
+### Rooms by Property Type
+
+```{r}
+housing |>
+  filter(!is.na(Type)) |>
+  group_by(Type) |>
+  summarise(
+    mean_rooms = mean(Rooms),
+    median_rooms = median(Rooms),
+    sd_rooms = sd(Rooms)
+  )
+```
+
+# Graphical Exploration
+
+## Plot 1: Number of Properties by Type
+
+```{r}
+ggplot(
+  housing |>
+    filter(!is.na(Type)),
+  aes(x = Type)
+) +
+  geom_bar() +
+  labs(
+    title = "Number of Properties by Property Type",
+    x = "Property Type",
+    y = "Number of Properties"
+  ) +
+  theme_minimal()
+```
+
+This plot shows how frequently each property type appears in the dataset.
+
+## Plot 2: Distribution of Property Prices
+
+```{r}
+price_limit <- quantile(
+  housing$Price,
+  0.99,
+  na.rm = TRUE
+)
+
+housing |>
+  filter(
+    !is.na(Price),
+    Price <= price_limit
+  ) |>
+  ggplot(aes(x = Price)) +
+  geom_histogram(
+    bins = 40
+  ) +
+  scale_x_continuous(
+    labels = scales::dollar
+  ) +
+  labs(
+    title = "Distribution of Melbourne Property Prices",
+    subtitle = "Prices above the 99th percentile are excluded for readability",
+    x = "Property Price",
+    y = "Number of Properties"
+  ) +
+  theme_minimal()
+```
+
+The price distribution is right-skewed, so the most extreme one percent of prices are excluded from this visualization to make the overall distribution easier to see.
+
+## Plot 3: Property Price by Property Type
+
+```{r}
+housing |>
+  filter(
+    !is.na(Price),
+    !is.na(Type),
+    Price <= price_limit
+  ) |>
+  ggplot(
+    aes(
+      x = Type,
+      y = Price,
+      fill = Type
+    )
+  ) +
+  geom_boxplot(
+    show.legend = FALSE
+  ) +
+  scale_y_continuous(
+    labels = scales::dollar
+  ) +
+  labs(
+    title = "Property Price by Property Type",
+    subtitle = "Prices above the 99th percentile are excluded for readability",
+    x = "Property Type",
+    y = "Property Price"
+  ) +
+  theme_minimal()
+```
+
+This plot compares the distribution of property prices across houses, units, and townhouses.
+
+## Plot 4: Price and Distance from Melbourne CBD
+
+```{r}
+housing |>
+  filter(
+    !is.na(Price),
+    !is.na(Distance),
+    !is.na(Type),
+    Price <= price_limit
+  ) |>
+  ggplot(
+    aes(
+      x = Distance,
+      y = Price,
+      color = Type
+    )
+  ) +
+  geom_point(
+    alpha = 0.35
+  ) +
+  scale_y_continuous(
+    labels = scales::dollar
+  ) +
+  labs(
+    title = "Property Price and Distance from Melbourne CBD",
+    subtitle = "Points are colored by property type",
+    x = "Distance from Melbourne CBD",
+    y = "Property Price",
+    color = "Property Type"
+  ) +
+  theme_minimal()
+```
+
+This plot examines the relationship between property price and distance from the Melbourne central business district while also showing differences between property types.
+
+## Plot 5: Median Price by Region and Property Type
+
+```{r}
+region_type_price <- housing |>
+  filter(
+    !is.na(Price),
+    !is.na(Regionname),
+    !is.na(Type)
+  ) |>
+  group_by(
+    Regionname,
+    Type
+  ) |>
+  summarise(
+    median_price = median(Price),
+    .groups = "drop"
+  )
+
+ggplot(
+  region_type_price,
+  aes(
+    x = reorder(
+      Regionname,
+      median_price
+    ),
+    y = median_price,
+    fill = Type
+  )
+) +
+  geom_col(
+    position = "dodge"
+  ) +
+  coord_flip() +
+  scale_y_continuous(
+    labels = scales::dollar
+  ) +
+  labs(
+    title = "Median Property Price by Region and Property Type",
+    x = "Region",
+    y = "Median Property Price",
+    fill = "Property Type"
+  ) +
+  theme_minimal()
+```
+
+This plot compares median property prices across regions while separating the results by property type.
+
+## Plot 6: Price and Number of Rooms by Region
+
+```{r}
+housing |>
+  filter(
+    !is.na(Price),
+    !is.na(Rooms),
+    !is.na(Regionname),
+    Price <= price_limit
+  ) |>
+  ggplot(
+    aes(
+      x = Rooms,
+      y = Price
+    )
+  ) +
+  geom_point(
+    alpha = 0.3
+  ) +
+  facet_wrap(
+    ~ Regionname
+  ) +
+  scale_y_continuous(
+    labels = scales::dollar
+  ) +
+  labs(
+    title = "Property Price and Number of Rooms by Region",
+    subtitle = "Each panel represents a Melbourne region",
+    x = "Number of Rooms",
+    y = "Property Price"
+  ) +
+  theme_minimal()
+```
+
+This faceted plot allows the relationship between price and number of rooms to be compared across different regions.
+
+## Plot 7: Heatmap of Median Prices
+
+```{r}
+heatmap_data <- housing |>
+  filter(
+    !is.na(Price),
+    !is.na(Regionname),
+    !is.na(Type)
+  ) |>
+  group_by(
+    Regionname,
+    Type
+  ) |>
+  summarise(
+    median_price = median(Price),
+    .groups = "drop"
+  )
+
+ggplot(
+  heatmap_data,
+  aes(
+    x = Type,
+    y = Regionname,
+    fill = median_price
+  )
+) +
+  geom_tile() +
+  scale_fill_viridis_c(
+    labels = scales::dollar
+  ) +
+  labs(
+    title = "Median Property Prices by Region and Property Type",
+    x = "Property Type",
+    y = "Region",
+    fill = "Median Price"
+  ) +
+  theme_minimal()
+```
+
+The heatmap provides another way to compare median prices across combinations of regions and property types.
+
+# Summary
+
+The Melbourne Housing dataset contains substantial variation in property prices, locations, and property characteristics. Property type and region both appear to be useful variables for comparing housing prices. The relationship between price, number of rooms, and distance from Melbourne's central business district can also be explored further in the interactive Shiny application.
