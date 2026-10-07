@@ -26,6 +26,17 @@ housing <- housing |>
     )
   )
 
+# Numeric variables that users can filter
+numeric_choices <- c(
+  "Price",
+  "Rooms",
+  "Distance",
+  "Bedroom2",
+  "Bathroom",
+  "Car",
+  "Landsize"
+)
+
 # ------------------------------------------------------------
 # User Interface
 # ------------------------------------------------------------
@@ -45,16 +56,62 @@ ui <- fluidPage(
       h3("Filter Properties"),
       
       p(
-        "Use the controls in this sidebar to filter the
-        Melbourne housing data."
+        "Choose property characteristics below, then click
+        Apply Filters to update the app."
       ),
       
       hr(),
       
-      h4("Property Filters"),
+      h4("Property Type"),
       
-      p(
-        "Interactive filtering controls will be added here."
+      checkboxGroupInput(
+        inputId = "type_filter",
+        label = NULL,
+        choices = sort(unique(housing$Type)),
+        selected = sort(unique(housing$Type))
+      ),
+      
+      h4("Region"),
+      
+      checkboxGroupInput(
+        inputId = "region_filter",
+        label = NULL,
+        choices = sort(unique(na.omit(housing$Regionname))),
+        selected = sort(unique(na.omit(housing$Regionname)))
+      ),
+      
+      hr(),
+      
+      h4("Numeric Filter 1"),
+      
+      selectInput(
+        inputId = "numeric_var1",
+        label = "Choose a numeric variable:",
+        choices = numeric_choices,
+        selected = "Price"
+      ),
+      
+      uiOutput("numeric_slider1"),
+      
+      hr(),
+      
+      h4("Numeric Filter 2"),
+      
+      selectInput(
+        inputId = "numeric_var2",
+        label = "Choose another numeric variable:",
+        choices = numeric_choices,
+        selected = "Rooms"
+      ),
+      
+      uiOutput("numeric_slider2"),
+      
+      hr(),
+      
+      actionButton(
+        inputId = "apply_filters",
+        label = "Apply Filters",
+        class = "btn-primary"
       )
       
     ),
@@ -86,37 +143,44 @@ ui <- fluidPage(
           ),
           
           p(
-            "Users will be able to filter properties and
-            investigate housing characteristics, prices,
-            property types, and geographic regions."
+            "Use the sidebar to subset the data by property type,
+            region, and two numeric variables."
           ),
           
           h3("Dataset"),
           
           p(
-            "The Melbourne Housing dataset contains information
-            about residential properties, including property
-            prices, number of rooms, property type, location,
-            distance from the Melbourne central business
-            district, and other housing characteristics."
+            "The Melbourne Housing dataset contains residential
+            property information including price, rooms,
+            property type, region, distance from Melbourne CBD,
+            and other housing characteristics."
           ),
           
           h3("How to Use the App"),
           
-          p(
-            "Use the sidebar to select the properties you are
-            interested in exploring."
+          tags$ul(
+            tags$li(
+              "Choose one or more property types."
+            ),
+            tags$li(
+              "Choose one or more Melbourne regions."
+            ),
+            tags$li(
+              "Select two numeric variables and choose their ranges."
+            ),
+            tags$li(
+              "Click Apply Filters to update the data used throughout the app."
+            )
           ),
           
           p(
-            "The Data Download tab will allow users to view and
-            download the filtered dataset."
+            "The Data Download tab will display the filtered data
+            and provide a download option."
           ),
           
           p(
-            "The Data Exploration tab will provide numerical
-            summaries, categorical summaries, and interactive
-            visualizations."
+            "The Data Exploration tab will provide categorical
+            summaries, numerical summaries, and visualizations."
           )
         ),
         
@@ -133,11 +197,6 @@ ui <- fluidPage(
           p(
             "The filtered Melbourne housing data will be
             displayed here."
-          ),
-          
-          p(
-            "Users will also be able to download the filtered
-            data as a CSV file."
           )
         ),
         
@@ -152,29 +211,8 @@ ui <- fluidPage(
           h2("Data Exploration"),
           
           p(
-            "Use this section to explore numerical and
-            categorical summaries of the Melbourne housing
-            data."
-          ),
-          
-          h3("Categorical Summaries"),
-          
-          p(
-            "One-way and two-way contingency tables will be
-            available here."
-          ),
-          
-          h3("Numerical Summaries"),
-          
-          p(
-            "Users will be able to compare numerical variables
-            across categorical groups."
-          ),
-          
-          h3("Visualizations"),
-          
-          p(
-            "Interactive plots will be available here."
+            "The summaries and plots in this section will use
+            the filtered dataset."
           )
         )
         
@@ -192,8 +230,109 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
   
-  # Reactive filtering and application outputs
-  # will be added in later steps.
+  # ----------------------------------------------------------
+  # Dynamic numeric slider 1
+  # ----------------------------------------------------------
+  
+  output$numeric_slider1 <- renderUI({
+    
+    req(input$numeric_var1)
+    
+    values <- housing[[input$numeric_var1]]
+    values <- values[!is.na(values)]
+    
+    sliderInput(
+      inputId = "numeric_range1",
+      label = paste(
+        "Select",
+        input$numeric_var1,
+        "range:"
+      ),
+      min = min(values),
+      max = max(values),
+      value = c(
+        min(values),
+        max(values)
+      )
+    )
+    
+  })
+  
+  # ----------------------------------------------------------
+  # Dynamic numeric slider 2
+  # ----------------------------------------------------------
+  
+  output$numeric_slider2 <- renderUI({
+    
+    req(input$numeric_var2)
+    
+    values <- housing[[input$numeric_var2]]
+    values <- values[!is.na(values)]
+    
+    sliderInput(
+      inputId = "numeric_range2",
+      label = paste(
+        "Select",
+        input$numeric_var2,
+        "range:"
+      ),
+      min = min(values),
+      max = max(values),
+      value = c(
+        min(values),
+        max(values)
+      )
+    )
+    
+  })
+  
+  # ----------------------------------------------------------
+  # Filtered data
+  #
+  # eventReactive means the data only updates when the
+  # Apply Filters button is clicked.
+  # ----------------------------------------------------------
+  
+  filtered_data <- eventReactive(
+    input$apply_filters,
+    {
+      
+      req(
+        input$type_filter,
+        input$region_filter,
+        input$numeric_var1,
+        input$numeric_var2,
+        input$numeric_range1,
+        input$numeric_range2
+      )
+      
+      data <- housing |>
+        filter(
+          Type %in% input$type_filter,
+          Regionname %in% input$region_filter
+        )
+      
+      # First numeric filter
+      data <- data |>
+        filter(
+          !is.na(.data[[input$numeric_var1]]),
+          .data[[input$numeric_var1]] >= input$numeric_range1[1],
+          .data[[input$numeric_var1]] <= input$numeric_range1[2]
+        )
+      
+      # Second numeric filter
+      data <- data |>
+        filter(
+          !is.na(.data[[input$numeric_var2]]),
+          .data[[input$numeric_var2]] >= input$numeric_range2[1],
+          .data[[input$numeric_var2]] <= input$numeric_range2[2]
+        )
+      
+      data
+      
+    },
+    ignoreNULL = FALSE
+  )
   
 }
 
