@@ -1,27 +1,33 @@
 ---
 title: "Melbourne Housing Data Exploration"
-format: html
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    embed-resources: true
 editor: visual
 ---
 
 ## Setup
 
 ```{r}
+#| message: false
+#| warning: false
+
 library(tidyverse)
 ```
 
-## Import Data
+## Import and Clean Data
 
 ```{r}
+#| message: false
+
 housing <- read_csv(
   "data/Melbourne_housing_FULL.csv",
-  na = c("", "NA", "#N/A")
+  na = c("", "NA", "#N/A"),
+  show_col_types = FALSE
 )
-```
 
-## Data Cleaning
-
-```{r}
 housing <- housing |>
   mutate(
     Type = recode(
@@ -33,9 +39,11 @@ housing <- housing |>
   )
 ```
 
-The Melbourne Housing dataset contains information about residential properties in Melbourne, Australia. The variables include property characteristics, location information, sale information, and property prices.
+The Melbourne Housing dataset contains information about residential properties in Melbourne, Australia. The variables include property characteristics, geographic information, sales information, and property prices.
 
 ## Initial Data Exploration
+
+The dataset contains 34,857 property records and 21 variables.
 
 ```{r}
 dim(housing)
@@ -49,11 +57,9 @@ names(housing)
 glimpse(housing)
 ```
 
-```{r}
-summary(housing)
-```
-
 ## Missing Values
+
+Some variables in the dataset contain a substantial number of missing observations. The variables that will be used most heavily in the application are checked below.
 
 ```{r}
 housing |>
@@ -65,21 +71,33 @@ housing |>
   )
 ```
 
-## Categorical Variable Summaries
+`Rooms` and `Type` contain no missing observations, while `Price` has a relatively large number of missing values. Missing price observations will be excluded when price is needed for a summary or visualization.
 
-### One-Way Contingency Table: Property Type
+# Categorical Variable Summaries
 
-```{r}
-table(housing$Type, useNA = "ifany")
-```
-
-### One-Way Contingency Table: Region
+## One-Way Table: Property Type
 
 ```{r}
-table(housing$Regionname, useNA = "ifany")
+table(
+  housing$Type,
+  useNA = "ifany"
+)
 ```
 
-### Two-Way Contingency Table: Property Type and Region
+Houses are the most common property type in the dataset, followed by units and townhouses.
+
+## One-Way Table: Region
+
+```{r}
+table(
+  housing$Regionname,
+  useNA = "ifany"
+)
+```
+
+The observations are distributed across eight Melbourne regions. Southern Metropolitan and Northern Metropolitan contain the largest numbers of properties.
+
+## Two-Way Table: Property Type and Region
 
 ```{r}
 table(
@@ -89,13 +107,18 @@ table(
 )
 ```
 
-## Numerical Summaries
+The two-way table shows that the distribution of property types differs considerably across regions.
 
-### Price by Property Type
+# Numerical Summaries
+
+## Property Price by Property Type
 
 ```{r}
 housing |>
-  filter(!is.na(Price), !is.na(Type)) |>
+  filter(
+    !is.na(Price),
+    !is.na(Type)
+  ) |>
   group_by(Type) |>
   summarise(
     count = n(),
@@ -107,11 +130,16 @@ housing |>
   )
 ```
 
-### Price by Region
+Houses have the highest mean and median prices, while units have the lowest typical prices.
+
+## Property Price by Region
 
 ```{r}
 housing |>
-  filter(!is.na(Price), !is.na(Regionname)) |>
+  filter(
+    !is.na(Price),
+    !is.na(Regionname)
+  ) |>
   group_by(Regionname) |>
   summarise(
     count = n(),
@@ -122,11 +150,15 @@ housing |>
   arrange(desc(mean_price))
 ```
 
-### Rooms by Property Type
+Southern Metropolitan has the highest mean and median property prices among the regions in the dataset.
+
+## Number of Rooms by Property Type
 
 ```{r}
 housing |>
-  filter(!is.na(Type)) |>
+  filter(
+    !is.na(Type)
+  ) |>
   group_by(Type) |>
   summarise(
     mean_rooms = mean(Rooms),
@@ -135,7 +167,21 @@ housing |>
   )
 ```
 
+Houses tend to contain more rooms than townhouses or units.
+
 # Graphical Exploration
+
+```{r}
+#| include: false
+
+price_limit <- quantile(
+  housing$Price,
+  0.99,
+  na.rm = TRUE
+)
+```
+
+The 99th percentile of price is used as an upper plotting limit for several visualizations. This prevents a small number of extremely expensive properties from compressing the majority of observations.
 
 ## Plot 1: Number of Properties by Type
 
@@ -154,23 +200,19 @@ ggplot(
   theme_minimal()
 ```
 
-This plot shows how frequently each property type appears in the dataset.
+Houses represent the majority of properties in the dataset, while townhouses are the least common property type.
 
 ## Plot 2: Distribution of Property Prices
 
 ```{r}
-price_limit <- quantile(
-  housing$Price,
-  0.99,
-  na.rm = TRUE
-)
-
 housing |>
   filter(
     !is.na(Price),
     Price <= price_limit
   ) |>
-  ggplot(aes(x = Price)) +
+  ggplot(
+    aes(x = Price)
+  ) +
   geom_histogram(
     bins = 40
   ) +
@@ -186,7 +228,7 @@ housing |>
   theme_minimal()
 ```
 
-The price distribution is right-skewed, so the most extreme one percent of prices are excluded from this visualization to make the overall distribution easier to see.
+Property prices have a right-skewed distribution, with most properties concentrated below roughly two million dollars and fewer observations at higher prices.
 
 ## Plot 3: Property Price by Property Type
 
@@ -219,9 +261,9 @@ housing |>
   theme_minimal()
 ```
 
-This plot compares the distribution of property prices across houses, units, and townhouses.
+Houses generally have higher prices than townhouses and units. Units have the lowest median property price.
 
-## Plot 4: Price and Distance from Melbourne CBD
+## Plot 4: Property Price and Distance from Melbourne CBD
 
 ```{r}
 housing |>
@@ -239,7 +281,7 @@ housing |>
     )
   ) +
   geom_point(
-    alpha = 0.35
+    alpha = 0.30
   ) +
   scale_y_continuous(
     labels = scales::dollar
@@ -254,7 +296,7 @@ housing |>
   theme_minimal()
 ```
 
-This plot examines the relationship between property price and distance from the Melbourne central business district while also showing differences between property types.
+Higher-priced properties appear more frequently closer to Melbourne's central business district. Property type also helps explain some of the variation in price.
 
 ## Plot 5: Median Price by Region and Property Type
 
@@ -301,9 +343,9 @@ ggplot(
   theme_minimal()
 ```
 
-This plot compares median property prices across regions while separating the results by property type.
+Median prices vary across both geographic region and property type. Southern Metropolitan and Eastern Metropolitan tend to contain the most expensive properties.
 
-## Plot 6: Price and Number of Rooms by Region
+## Plot 6: Property Price and Number of Rooms by Region
 
 ```{r}
 housing |>
@@ -320,7 +362,7 @@ housing |>
     )
   ) +
   geom_point(
-    alpha = 0.3
+    alpha = 0.25
   ) +
   facet_wrap(
     ~ Regionname
@@ -337,9 +379,9 @@ housing |>
   theme_minimal()
 ```
 
-This faceted plot allows the relationship between price and number of rooms to be compared across different regions.
+The relationship between the number of rooms and property price differs across Melbourne regions. The faceted display makes these regional patterns easier to compare.
 
-## Plot 7: Heatmap of Median Prices
+## Plot 7: Heatmap of Median Property Prices
 
 ```{r}
 heatmap_data <- housing |>
@@ -378,8 +420,23 @@ ggplot(
   theme_minimal()
 ```
 
-The heatmap provides another way to compare median prices across combinations of regions and property types.
+The heatmap provides a compact comparison of median property prices across combinations of region and property type. The highest median prices are concentrated among houses in the more expensive metropolitan regions.
+
+# Variables Selected for the Shiny Application
+
+Based on the initial exploration, the following variables will work well for the main filtering controls in the Shiny application:
+
+-   **Property Type (`Type`)** — categorical
+-   **Region (`Regionname`)** — categorical
+-   **Price (`Price`)** — quantitative
+-   **Number of Rooms (`Rooms`)** — quantitative
+
+Property type and region provide meaningful categories for users to explore, while price and number of rooms are intuitive numerical characteristics of residential properties.
 
 # Summary
 
-The Melbourne Housing dataset contains substantial variation in property prices, locations, and property characteristics. Property type and region both appear to be useful variables for comparing housing prices. The relationship between price, number of rooms, and distance from Melbourne's central business district can also be explored further in the interactive Shiny application.
+The Melbourne Housing dataset contains substantial variation in property prices, geographic location, property type, and housing characteristics.
+
+The exploratory analysis suggests that both **region** and **property type** are strongly associated with differences in property prices. Properties closer to Melbourne's central business district also tend to include a greater concentration of higher-priced homes.
+
+These patterns make the dataset well suited for an interactive Shiny application where users can subset properties and dynamically explore categorical summaries, numerical summaries, and visualizations.
