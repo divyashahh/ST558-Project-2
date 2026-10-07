@@ -5,6 +5,7 @@
 
 library(shiny)
 library(tidyverse)
+library(DT)
 
 # ------------------------------------------------------------
 # Load and clean data
@@ -26,7 +27,6 @@ housing <- housing |>
     )
   )
 
-# Numeric variables that users can filter
 numeric_choices <- c(
   "Price",
   "Rooms",
@@ -138,49 +138,65 @@ ui <- fluidPage(
           h2("About the Melbourne Housing Explorer"),
           
           p(
-            "This application allows users to explore housing
-            data from Melbourne, Australia."
+            "This application allows users to explore residential
+            property data from Melbourne, Australia."
           ),
           
           p(
-            "Use the sidebar to subset the data by property type,
-            region, and two numeric variables."
+            "Users can filter the dataset by property type,
+            geographic region, and selected numeric variables."
           ),
           
-          h3("Dataset"),
+          h3("About the Data"),
           
           p(
-            "The Melbourne Housing dataset contains residential
-            property information including price, rooms,
-            property type, region, distance from Melbourne CBD,
-            and other housing characteristics."
+            "The dataset contains information on Melbourne
+            residential properties including property prices,
+            number of rooms, property type, region, distance from
+            Melbourne's central business district, land size,
+            building area, and other housing characteristics."
+          ),
+          
+          p(
+            "For more information about the Melbourne Housing dataset, visit:"
+          ),
+          
+          tags$a(
+            href = "https://www.kaggle.com/datasets/anthonypino/melbourne-housing-market",
+            "Melbourne Housing Market Dataset",
+            target = "_blank"
+          ),
+          
+          br(),
+          br(),
+          
+          tags$img(
+            src = "https://images.unsplash.com/photo-1518005020951-eccb494ad742",
+            width = "100%",
+            style = "max-width: 600px;"
           ),
           
           h3("How to Use the App"),
           
           tags$ul(
             tags$li(
-              "Choose one or more property types."
+              "Use the sidebar to select one or more property types."
             ),
             tags$li(
               "Choose one or more Melbourne regions."
             ),
             tags$li(
-              "Select two numeric variables and choose their ranges."
+              "Choose two numeric variables and select their ranges."
             ),
             tags$li(
-              "Click Apply Filters to update the data used throughout the app."
+              "Click Apply Filters to update the dataset."
+            ),
+            tags$li(
+              "Use the Data Download tab to view or download the filtered data."
+            ),
+            tags$li(
+              "Use the Data Exploration tab to create summaries and plots."
             )
-          ),
-          
-          p(
-            "The Data Download tab will display the filtered data
-            and provide a download option."
-          ),
-          
-          p(
-            "The Data Exploration tab will provide categorical
-            summaries, numerical summaries, and visualizations."
           )
         ),
         
@@ -192,11 +208,25 @@ ui <- fluidPage(
           title = "Data Download",
           value = "Data Download",
           
-          h2("Data Download"),
+          h2("Filtered Housing Data"),
           
           p(
-            "The filtered Melbourne housing data will be
-            displayed here."
+            "The table below displays the data based on the most
+            recently applied sidebar filters."
+          ),
+          
+          br(),
+          
+          downloadButton(
+            outputId = "download_data",
+            label = "Download Filtered Data"
+          ),
+          
+          br(),
+          br(),
+          
+          DT::dataTableOutput(
+            outputId = "housing_table"
           )
         ),
         
@@ -211,8 +241,8 @@ ui <- fluidPage(
           h2("Data Exploration"),
           
           p(
-            "The summaries and plots in this section will use
-            the filtered dataset."
+            "Interactive numerical summaries, categorical summaries,
+            and visualizations will be available in this section."
           )
         )
         
@@ -287,10 +317,7 @@ server <- function(input, output, session) {
   })
   
   # ----------------------------------------------------------
-  # Filtered data
-  #
-  # eventReactive means the data only updates when the
-  # Apply Filters button is clicked.
+  # Reactive filtered dataset
   # ----------------------------------------------------------
   
   filtered_data <- eventReactive(
@@ -312,7 +339,6 @@ server <- function(input, output, session) {
           Regionname %in% input$region_filter
         )
       
-      # First numeric filter
       data <- data |>
         filter(
           !is.na(.data[[input$numeric_var1]]),
@@ -320,7 +346,6 @@ server <- function(input, output, session) {
           .data[[input$numeric_var1]] <= input$numeric_range1[2]
         )
       
-      # Second numeric filter
       data <- data |>
         filter(
           !is.na(.data[[input$numeric_var2]]),
@@ -332,6 +357,57 @@ server <- function(input, output, session) {
       
     },
     ignoreNULL = FALSE
+  )
+  
+  # ----------------------------------------------------------
+  # Data table
+  # ----------------------------------------------------------
+  
+  output$housing_table <- DT::renderDataTable({
+    
+    data <- filtered_data()
+    
+    validate(
+      need(
+        nrow(data) > 0,
+        "No properties match the selected filters."
+      )
+    )
+    
+    DT::datatable(
+      data,
+      options = list(
+        pageLength = 10,
+        scrollX = TRUE
+      ),
+      rownames = FALSE
+    )
+    
+  })
+  
+  # ----------------------------------------------------------
+  # Download filtered data
+  # ----------------------------------------------------------
+  
+  output$download_data <- downloadHandler(
+    
+    filename = function() {
+      paste0(
+        "melbourne_housing_filtered_",
+        Sys.Date(),
+        ".csv"
+      )
+    },
+    
+    content = function(file) {
+      
+      write_csv(
+        filtered_data(),
+        file
+      )
+      
+    }
+    
   )
   
 }
