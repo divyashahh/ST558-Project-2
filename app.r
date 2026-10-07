@@ -6,6 +6,7 @@
 library(shiny)
 library(tidyverse)
 library(DT)
+library(shinycssloaders)
 
 # ------------------------------------------------------------
 # Load and clean data
@@ -26,8 +27,6 @@ housing <- housing |>
       "t" = "Townhouse"
     )
   )
-
-# Variables available for filtering/exploration
 
 numeric_choices <- c(
   "Price",
@@ -51,10 +50,41 @@ categorical_choices <- c(
 )
 
 # ------------------------------------------------------------
-# User Interface
+# UI
 # ------------------------------------------------------------
 
 ui <- fluidPage(
+  
+  tags$head(
+    tags$style(
+      HTML("
+        body {
+          background-color: #f7f7f7;
+        }
+
+        .well {
+          background-color: white;
+        }
+
+        h2, h3 {
+          margin-top: 20px;
+        }
+
+        .app-image {
+          max-width: 650px;
+          width: 100%;
+          margin-top: 15px;
+          margin-bottom: 20px;
+          border-radius: 6px;
+        }
+
+        .filter-note {
+          color: #555555;
+          font-size: 13px;
+        }
+      ")
+    )
+  ),
   
   titlePanel("Melbourne Housing Explorer"),
   
@@ -71,6 +101,12 @@ ui <- fluidPage(
       p(
         "Choose property characteristics below, then click
         Apply Filters to update the app."
+      ),
+      
+      p(
+        class = "filter-note",
+        "Changing a control will not update the results until
+        Apply Filters is pressed."
       ),
       
       hr(),
@@ -125,8 +161,12 @@ ui <- fluidPage(
         inputId = "apply_filters",
         label = "Apply Filters",
         class = "btn-primary"
-      )
+      ),
       
+      br(),
+      br(),
+      
+      textOutput("row_count")
     ),
     
     # ========================================================
@@ -151,50 +191,67 @@ ui <- fluidPage(
           h2("About the Melbourne Housing Explorer"),
           
           p(
-            "This application allows users to explore residential
-            property data from Melbourne, Australia."
+            "This application allows users to interactively
+            explore residential property data from Melbourne,
+            Australia."
           ),
           
-          p(
-            "Users can filter properties by type, region, and
-            selected numeric characteristics."
+          tags$img(
+            src = "melbourne.jpg",
+            class = "app-image",
+            alt = "Melbourne housing"
           ),
           
           h3("About the Data"),
           
           p(
-            "The dataset contains information including property
-            price, number of rooms, property type, geographic
-            region, distance from Melbourne CBD, land size,
-            building area, and other property characteristics."
+            "The dataset contains information about residential
+            properties including price, number of rooms,
+            property type, geographic region, distance from the
+            Melbourne CBD, land size, building area, and other
+            property characteristics."
           ),
-          
-          p("More information about the dataset:"),
           
           tags$a(
             href =
               "https://www.kaggle.com/datasets/anthonypino/melbourne-housing-market",
-            "Melbourne Housing Market Dataset",
+            "View the Melbourne Housing Market data source",
             target = "_blank"
           ),
           
-          h3("How to Use the App"),
+          h3("Using the Sidebar"),
           
           tags$ul(
             tags$li(
-              "Use the sidebar to choose property types and regions."
+              "Select one or more property types."
             ),
             tags$li(
-              "Choose two numerical variables and their desired ranges."
+              "Select one or more Melbourne regions."
             ),
             tags$li(
-              "Click Apply Filters to update the app."
+              "Choose two numeric variables and their ranges."
             ),
             tags$li(
-              "Use Data Download to view and save the filtered data."
+              "Press Apply Filters to apply all sidebar selections."
+            )
+          ),
+          
+          h3("App Tabs"),
+          
+          tags$ul(
+            tags$li(
+              strong("About: "),
+              "Provides information about the app and dataset."
             ),
             tags$li(
-              "Use Data Exploration to create tables, summaries, and graphs."
+              strong("Data Download: "),
+              "Displays the filtered dataset and allows it to be
+              downloaded as a CSV file."
+            ),
+            tags$li(
+              strong("Data Exploration: "),
+              "Creates categorical summaries, numerical summaries,
+              and visualizations from the filtered data."
             )
           )
         ),
@@ -210,8 +267,8 @@ ui <- fluidPage(
           h2("Filtered Housing Data"),
           
           p(
-            "The table below displays the data from the most
-            recently applied filters."
+            "The table reflects the most recently applied
+            sidebar filters."
           ),
           
           downloadButton(
@@ -222,7 +279,9 @@ ui <- fluidPage(
           br(),
           br(),
           
-          DT::dataTableOutput("housing_table")
+          shinycssloaders::withSpinner(
+            DT::dataTableOutput("housing_table")
+          )
         ),
         
         # ----------------------------------------------------
@@ -237,13 +296,13 @@ ui <- fluidPage(
           
           p(
             "Use the options below to create summaries and
-            visualizations using the filtered housing data."
+            visualizations from the filtered housing data."
           ),
           
           tabsetPanel(
             
             # ==================================================
-            # Categorical summaries
+            # Categorical
             # ==================================================
             
             tabPanel(
@@ -268,14 +327,14 @@ ui <- fluidPage(
               
               selectInput(
                 inputId = "cat_var2",
-                label = "Choose the first categorical variable:",
+                label = "First categorical variable:",
                 choices = categorical_choices,
                 selected = "Type"
               ),
               
               selectInput(
                 inputId = "cat_var3",
-                label = "Choose the second categorical variable:",
+                label = "Second categorical variable:",
                 choices = categorical_choices,
                 selected = "Regionname"
               ),
@@ -284,15 +343,13 @@ ui <- fluidPage(
             ),
             
             # ==================================================
-            # Numerical summaries
+            # Numerical
             # ==================================================
             
             tabPanel(
               "Numerical Summaries",
               
               br(),
-              
-              h3("Numerical Summary by Category"),
               
               selectInput(
                 inputId = "summary_numeric",
@@ -308,7 +365,9 @@ ui <- fluidPage(
                 selected = "Type"
               ),
               
-              DT::dataTableOutput("numeric_summary")
+              shinycssloaders::withSpinner(
+                DT::dataTableOutput("numeric_summary")
+              )
             ),
             
             # ==================================================
@@ -338,15 +397,15 @@ ui <- fluidPage(
                   "input.plot_type == 'Bar Chart'",
                 
                 selectInput(
-                  inputId = "bar_x",
-                  label = "Categorical variable:",
+                  "bar_x",
+                  "Categorical variable:",
                   choices = categorical_choices,
                   selected = "Type"
                 ),
                 
                 selectInput(
-                  inputId = "bar_fill",
-                  label = "Color/group by:",
+                  "bar_fill",
+                  "Color/group by:",
                   choices = categorical_choices,
                   selected = "Regionname"
                 )
@@ -357,15 +416,15 @@ ui <- fluidPage(
                   "input.plot_type == 'Box Plot'",
                 
                 selectInput(
-                  inputId = "box_x",
-                  label = "Categorical variable:",
+                  "box_x",
+                  "Categorical variable:",
                   choices = categorical_choices,
                   selected = "Type"
                 ),
                 
                 selectInput(
-                  inputId = "box_y",
-                  label = "Numeric variable:",
+                  "box_y",
+                  "Numeric variable:",
                   choices = numeric_choices,
                   selected = "Price"
                 )
@@ -376,22 +435,22 @@ ui <- fluidPage(
                   "input.plot_type == 'Scatter Plot'",
                 
                 selectInput(
-                  inputId = "scatter_x",
-                  label = "X variable:",
+                  "scatter_x",
+                  "X variable:",
                   choices = numeric_choices,
                   selected = "Distance"
                 ),
                 
                 selectInput(
-                  inputId = "scatter_y",
-                  label = "Y variable:",
+                  "scatter_y",
+                  "Y variable:",
                   choices = numeric_choices,
                   selected = "Price"
                 ),
                 
                 selectInput(
-                  inputId = "scatter_color",
-                  label = "Color by:",
+                  "scatter_color",
+                  "Color by:",
                   choices = categorical_choices,
                   selected = "Type"
                 )
@@ -402,22 +461,22 @@ ui <- fluidPage(
                   "input.plot_type == 'Faceted Scatter Plot'",
                 
                 selectInput(
-                  inputId = "facet_x",
-                  label = "X variable:",
+                  "facet_x",
+                  "X variable:",
                   choices = numeric_choices,
                   selected = "Rooms"
                 ),
                 
                 selectInput(
-                  inputId = "facet_y",
-                  label = "Y variable:",
+                  "facet_y",
+                  "Y variable:",
                   choices = numeric_choices,
                   selected = "Price"
                 ),
                 
                 selectInput(
-                  inputId = "facet_var",
-                  label = "Facet by:",
+                  "facet_var",
+                  "Facet by:",
                   choices = categorical_choices,
                   selected = "Regionname"
                 )
@@ -428,35 +487,34 @@ ui <- fluidPage(
                   "input.plot_type == 'Heatmap'",
                 
                 selectInput(
-                  inputId = "heat_x",
-                  label = "First categorical variable:",
+                  "heat_x",
+                  "First categorical variable:",
                   choices = categorical_choices,
                   selected = "Type"
                 ),
                 
                 selectInput(
-                  inputId = "heat_y",
-                  label = "Second categorical variable:",
+                  "heat_y",
+                  "Second categorical variable:",
                   choices = categorical_choices,
                   selected = "Regionname"
                 ),
                 
                 selectInput(
-                  inputId = "heat_numeric",
-                  label = "Numeric variable to summarize:",
+                  "heat_numeric",
+                  "Numeric variable to summarize:",
                   choices = numeric_choices,
                   selected = "Price"
                 )
               ),
               
-              br(),
-              
-              plotOutput(
-                outputId = "exploration_plot",
-                height = "600px"
+              shinycssloaders::withSpinner(
+                plotOutput(
+                  "exploration_plot",
+                  height = "600px"
+                )
               )
             )
-            
           )
         )
       )
@@ -471,7 +529,7 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   
   # ==========================================================
-  # Dynamic sidebar sliders
+  # Dynamic Sliders
   # ==========================================================
   
   output$numeric_slider1 <- renderUI({
@@ -482,12 +540,8 @@ server <- function(input, output, session) {
     values <- values[!is.na(values)]
     
     sliderInput(
-      inputId = "numeric_range1",
-      label = paste(
-        "Select",
-        input$numeric_var1,
-        "range:"
-      ),
+      "numeric_range1",
+      paste("Select", input$numeric_var1, "range:"),
       min = min(values),
       max = max(values),
       value = c(
@@ -505,12 +559,8 @@ server <- function(input, output, session) {
     values <- values[!is.na(values)]
     
     sliderInput(
-      inputId = "numeric_range2",
-      label = paste(
-        "Select",
-        input$numeric_var2,
-        "range:"
-      ),
+      "numeric_range2",
+      paste("Select", input$numeric_var2, "range:"),
       min = min(values),
       max = max(values),
       value = c(
@@ -521,16 +571,25 @@ server <- function(input, output, session) {
   })
   
   # ==========================================================
-  # Reactive filtered data
+  # Filter Data
   # ==========================================================
   
   filtered_data <- eventReactive(
     input$apply_filters,
     {
       
+      validate(
+        need(
+          length(input$type_filter) > 0,
+          "Please select at least one property type."
+        ),
+        need(
+          length(input$region_filter) > 0,
+          "Please select at least one region."
+        )
+      )
+      
       req(
-        input$type_filter,
-        input$region_filter,
         input$numeric_var1,
         input$numeric_var2,
         input$numeric_range1,
@@ -567,7 +626,21 @@ server <- function(input, output, session) {
   )
   
   # ==========================================================
-  # Data Download tab
+  # Row count
+  # ==========================================================
+  
+  output$row_count <- renderText({
+    
+    data <- filtered_data()
+    
+    paste(
+      format(nrow(data), big.mark = ","),
+      "properties currently selected"
+    )
+  })
+  
+  # ==========================================================
+  # Data Table
   # ==========================================================
   
   output$housing_table <- DT::renderDataTable({
@@ -577,7 +650,7 @@ server <- function(input, output, session) {
     validate(
       need(
         nrow(data) > 0,
-        "No properties match the selected filters."
+        "No properties match the current filters."
       )
     )
     
@@ -591,10 +664,13 @@ server <- function(input, output, session) {
     )
   })
   
+  # ==========================================================
+  # Download
+  # ==========================================================
+  
   output$download_data <- downloadHandler(
     
     filename = function() {
-      
       paste0(
         "melbourne_housing_filtered_",
         Sys.Date(),
@@ -612,7 +688,7 @@ server <- function(input, output, session) {
   )
   
   # ==========================================================
-  # One-way contingency table
+  # One-Way Table
   # ==========================================================
   
   output$one_way_table <- renderTable({
@@ -633,7 +709,7 @@ server <- function(input, output, session) {
   })
   
   # ==========================================================
-  # Two-way contingency table
+  # Two-Way Table
   # ==========================================================
   
   output$two_way_table <- renderTable({
@@ -642,8 +718,8 @@ server <- function(input, output, session) {
     
     validate(
       need(
-        nrow(data) > 0,
-        "No observations available."
+        input$cat_var2 != input$cat_var3,
+        "Choose two different categorical variables."
       )
     )
     
@@ -655,7 +731,7 @@ server <- function(input, output, session) {
   })
   
   # ==========================================================
-  # Numerical summary
+  # Numeric Summary
   # ==========================================================
   
   output$numeric_summary <- DT::renderDataTable({
@@ -685,17 +761,25 @@ server <- function(input, output, session) {
         .groups = "drop"
       )
     
+    validate(
+      need(
+        nrow(summary_data) > 0,
+        "No complete observations are available for this summary."
+      )
+    )
+    
     DT::datatable(
       summary_data,
       options = list(
-        pageLength = 10
+        pageLength = 10,
+        scrollX = TRUE
       ),
       rownames = FALSE
     )
   })
   
   # ==========================================================
-  # Exploration plot
+  # Plot
   # ==========================================================
   
   output$exploration_plot <- renderPlot({
@@ -709,11 +793,14 @@ server <- function(input, output, session) {
       )
     )
     
-    # --------------------------------------------------------
-    # Bar chart
-    # --------------------------------------------------------
-    
     if (input$plot_type == "Bar Chart") {
+      
+      validate(
+        need(
+          input$bar_x != input$bar_fill,
+          "Choose different variables for the x-axis and grouping."
+        )
+      )
       
       plot_data <- data |>
         filter(
@@ -751,10 +838,6 @@ server <- function(input, output, session) {
         )
     }
     
-    # --------------------------------------------------------
-    # Box plot
-    # --------------------------------------------------------
-    
     else if (input$plot_type == "Box Plot") {
       
       plot_data <- data |>
@@ -762,6 +845,13 @@ server <- function(input, output, session) {
           !is.na(.data[[input$box_x]]),
           !is.na(.data[[input$box_y]])
         )
+      
+      validate(
+        need(
+          nrow(plot_data) > 0,
+          "No complete observations are available for this plot."
+        )
+      )
       
       ggplot(
         plot_data,
@@ -793,11 +883,14 @@ server <- function(input, output, session) {
         )
     }
     
-    # --------------------------------------------------------
-    # Scatter plot
-    # --------------------------------------------------------
-    
     else if (input$plot_type == "Scatter Plot") {
+      
+      validate(
+        need(
+          input$scatter_x != input$scatter_y,
+          "Choose different x and y variables."
+        )
+      )
       
       plot_data <- data |>
         filter(
@@ -830,14 +923,17 @@ server <- function(input, output, session) {
         theme_minimal()
     }
     
-    # --------------------------------------------------------
-    # Faceted scatter plot
-    # --------------------------------------------------------
-    
     else if (
       input$plot_type ==
       "Faceted Scatter Plot"
     ) {
+      
+      validate(
+        need(
+          input$facet_x != input$facet_y,
+          "Choose different x and y variables."
+        )
+      )
       
       plot_data <- data |>
         filter(
@@ -854,7 +950,7 @@ server <- function(input, output, session) {
         )
       ) +
         geom_point(
-          alpha = 0.30
+          alpha = 0.3
         ) +
         facet_wrap(
           vars(
@@ -875,11 +971,14 @@ server <- function(input, output, session) {
         theme_minimal()
     }
     
-    # --------------------------------------------------------
-    # Heatmap
-    # --------------------------------------------------------
-    
     else if (input$plot_type == "Heatmap") {
+      
+      validate(
+        need(
+          input$heat_x != input$heat_y,
+          "Choose two different categorical variables."
+        )
+      )
       
       plot_data <- data |>
         filter(
@@ -898,6 +997,13 @@ server <- function(input, output, session) {
             ),
           .groups = "drop"
         )
+      
+      validate(
+        need(
+          nrow(plot_data) > 0,
+          "No complete observations are available for this heatmap."
+        )
+      )
       
       ggplot(
         plot_data,
@@ -938,7 +1044,7 @@ server <- function(input, output, session) {
 }
 
 # ------------------------------------------------------------
-# Run Application
+# Run app
 # ------------------------------------------------------------
 
 shinyApp(
